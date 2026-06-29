@@ -1,0 +1,48 @@
+{
+  "name": "TAKAO NAVI ― 高尾山 登山ナビ",
+  "short_name": "TAKAO NAVI",
+  "description": "高尾山の全8コースに対応したオフライン登山ナビ。進捗・距離・カロリー・標高をリアルタイム表示。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef3ec",
+  "theme_color": "#13632f",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%2313632f'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle'%3E%F0%9F%8F%94%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%2313632f'/%3E%3Ctext x='256' y='350' font-size='300' text-anchor='middle'%3E%F0%9F%8F%94%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+{
+  "name": "TAKAO NAVI ― 高尾山 登山ナビ",
+  "short_name": "TAKAO NAVI",
+  "description": "高尾山の全8コースに対応したオフライン登山ナビ。進捗・距離・カロリー・標高をリアルタイム表示。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef3ec",
+  "theme_color": "#13632f",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%2313632f'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle'%3E%F0%9F%8F%94%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%2313632f'/%3E%3Ctext x='256' y='350' font-size='300' text-anchor='middle'%3E%F0%9F%8F%94%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
