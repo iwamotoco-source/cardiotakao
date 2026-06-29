@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#13632f">
+<title>TAKAO NAVI</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{
+    --g1:#1f7a3d;--g2:#34a853;--g3:#43b65f;--ink:#16241a;--sub:#5f7264;--line:#e3eae0;
+    --bg:#eef3ec;--card:#fff;--accent:#ff6b35;--blue:#2563eb;--soft:#f4f8f2;
+    --sh:0 4px 20px rgba(22,55,30,.08);--safe-t:env(safe-area-inset-top);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:var(--bg);color:var(--ink);overflow:hidden;}
+
+  /* ===== layout: 上半分マップ / 下半分パネル ===== */
+  #app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+  #mapwrap{position:relative;height:50%;min-height:230px;}
+  #map{position:absolute;inset:0;}
+  #panel{height:50%;overflow-y:auto;background:var(--bg);padding:12px 12px 26px;-webkit-overflow-scrolling:touch;}
+
+  /* ===== hamburger ===== */
+  .ham{position:absolute;top:calc(12px + var(--safe-t));left:12px;z-index:1100;width:46px;height:46px;border-radius:13px;
+    background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.22);border:none;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
+  .ham span{width:20px;height:2.4px;background:var(--g1);border-radius:2px;}
+  .brandmini{position:absolute;top:calc(15px + var(--safe-t));left:68px;z-index:1100;
+    background:rgba(255,255,255,.92);padding:8px 13px;border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.18);
+    font-weight:800;font-size:14px;color:var(--g1);display:flex;align-items:center;gap:6px;}
+
+  /* ===== overlay: ルート名 + 進捗% (マップ右下) ===== */
+  .mapoverlay{position:absolute;right:12px;bottom:14px;z-index:1000;text-align:right;}
+  .ov-pct{background:linear-gradient(135deg,var(--g1),var(--g3));color:#fff;border-radius:15px;
+    padding:8px 15px;box-shadow:0 5px 18px rgba(31,122,61,.4);display:inline-flex;align-items:baseline;gap:2px;margin-bottom:7px;}
+  .ov-pct b{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em;}
+  .ov-pct small{font-size:14px;font-weight:700;}
+  .ov-pct .lab{font-size:9px;font-weight:700;opacity:.9;margin-left:6px;align-self:center;letter-spacing:.05em;}
+  .ov-route{background:rgba(255,255,255,.95);border-radius:12px;padding:7px 13px;box-shadow:0 3px 12px rgba(0,0,0,.2);
+    font-size:12.5px;font-weight:800;color:var(--ink);display:inline-flex;align-items:center;gap:6px;max-width:72vw;}
+  .ov-route .bd{font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;color:#fff;}
+  .b1{background:#34a853;}.b2{background:#f59e0b;}.b3{background:#ef4444;}
+
+  /* offline pill */
+  .offpill{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);z-index:1100;
+    background:#fff5eb;color:#9a4a00;border:1px solid #ffd9b3;border-radius:20px;padding:5px 13px;font-size:11px;font-weight:800;
+    box-shadow:0 3px 10px rgba(0,0,0,.12);display:none;}
+  .offpill.show{display:block;}
+
+  /* ===== drawer ===== */
+  .scrim{position:fixed;inset:0;background:rgba(15,30,18,.45);z-index:1500;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .scrim.open{opacity:1;pointer-events:auto;}
+  .drawer{position:fixed;top:0;left:0;bottom:0;width:86%;max-width:340px;background:var(--bg);z-index:1600;
+    transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow-y:auto;box-shadow:6px 0 30px rgba(0,0,0,.25);}
+  .drawer.open{transform:translateX(0);}
+  .dr-head{background:linear-gradient(140deg,#13632f,#43b65f);color:#fff;padding:calc(20px + var(--safe-t)) 18px 18px;}
+  .dr-head .logo{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:21px;margin-bottom:9px;}
+  .dr-head h2{margin:0;font-size:19px;font-weight:800;}
+  .dr-head p{margin:2px 0 0;font-size:11px;opacity:.9;}
+  .dr-body{padding:14px;}
+  .dr-sec{background:var(--card);border-radius:15px;padding:15px;margin-bottom:13px;box-shadow:var(--sh);}
+  .dr-sec .label{font-size:11px;font-weight:800;color:var(--g1);letter-spacing:.06em;text-transform:uppercase;margin:0 0 11px;}
+  select,input{font-size:15px;padding:11px 12px;border:1.5px solid var(--line);border-radius:12px;width:100%;background:#fff;color:var(--ink);font-family:inherit;}
+  select:focus,input:focus{outline:none;border-color:var(--g2);}
+  .flab{font-size:11px;color:var(--sub);font-weight:700;margin-bottom:5px;display:block;}
+  .row{display:flex;gap:9px;}.row>div{flex:1;}.mt{margin-top:11px;}
+  .btn{border:none;border-radius:12px;font-size:14px;font-weight:800;padding:12px;width:100%;cursor:pointer;font-family:inherit;transition:transform .08s;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;}
+  .btn-save{background:#eef4ff;color:var(--blue);border:1.5px solid #d4e2ff;}
+  .btn-dl{background:#fff3eb;color:#c2410c;border:1.5px solid #ffd9b3;}
+  .seg{display:flex;background:var(--soft);border-radius:12px;padding:4px;gap:4px;}
+  .seg button{flex:1;border:none;background:transparent;color:var(--sub);font-size:13.5px;font-weight:800;padding:9px;border-radius:9px;cursor:pointer;font-family:inherit;transition:all .18s;}
+  .seg button.on{background:#fff;color:var(--g1);box-shadow:0 2px 8px rgba(0,0,0,.09);}
+  .cdesc{font-size:11.5px;color:var(--sub);line-height:1.6;margin-top:9px;background:var(--soft);border-radius:11px;padding:10px;}
+  .savemsg,.dlmsg{font-size:11px;color:var(--g1);text-align:center;margin-top:8px;min-height:14px;font-weight:700;}
+  .dlmsg{color:var(--blue);}
+
+  /* ===== main control button (panel top) ===== */
+  .mainctrl{display:flex;gap:10px;margin-bottom:12px;}
+  .mainctrl .btn{flex:1;}
+  .btn-stop{background:linear-gradient(135deg,#d84315,var(--accent))!important;color:#fff;}
+  .dirseg{width:135px;}
+  #status{text-align:center;font-size:11.5px;color:var(--sub);margin-bottom:12px;min-height:15px;}
+
+  /* ===== stat tiles ===== */
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+  .tile{background:var(--card);border-radius:14px;padding:11px 5px;text-align:center;box-shadow:var(--sh);}
+  .tile .ico{font-size:14px;margin-bottom:2px;}
+  .tile .v{font-size:18px;font-weight:800;letter-spacing:-.01em;line-height:1;}
+  .tile .v small{font-size:10px;color:var(--sub);font-weight:700;}
+  .tile .l{font-size:9px;color:var(--sub);margin-top:4px;font-weight:600;}
+  .tile.cal .v{color:var(--accent);}.tile.gain .v{color:#0f9d58;}.tile.eta .v{color:var(--blue);font-size:15px;}
+
+  /* ===== elevation chart ===== */
+  .chartcard{background:var(--card);border-radius:15px;padding:14px;box-shadow:var(--sh);}
+  .chartcard .label{font-size:11px;font-weight:800;color:var(--g1);letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px;display:flex;justify-content:space-between;}
+  .chartcard .label .now{color:var(--accent);font-size:11px;}
+  svg.chart{width:100%;height:120px;display:block;}
+  .chart-foot{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-top:5px;font-weight:600;}
+  .warn{font-size:11px;color:#9a4a00;background:#fff5eb;border:1px solid #ffe0c2;border-radius:10px;padding:8px 10px;margin:11px 0 0;font-weight:600;}
+  .youdot{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 2px var(--accent);}
+  .pulse{animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,107,53,.5);}70%{box-shadow:0 0 0 13px rgba(255,107,53,0);}100%{box-shadow:0 0 0 0 rgba(255,107,53,0);}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="mapwrap">
+    <div id="map"></div>
+    <button class="ham" id="hamBtn" aria-label="メニュー"><span></span><span></span><span></span></button>
+    <div class="brandmini">🏔 TAKAO NAVI</div>
+    <div class="offpill" id="offPill">📴 オフライン（保存地図で表示中）</div>
+    <div class="mapoverlay">
+      <div class="ov-pct"><b id="pctTxt">0</b><small>%</small><span class="lab" id="goalLbl">山頂まで</span></div><br>
+      <div class="ov-route" id="ovRoute"><span class="bd b1">初級</span><span id="ovRouteName">1号路</span></div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div class="mainctrl">
+      <button id="gpsBtn" class="btn btn-primary">▶ GPSスタート</button>
+      <div class="seg dirseg">
+        <button id="dirUp" class="on">▲登り</button>
+        <button id="dirDown">▼下り</button>
+      </div>
+    </div>
+    <div id="status">スタートで位置情報の使用許可を尋ねます。</div>
+
+    <div class="tiles">
+      <div class="tile"><div class="ico">🚶</div><div class="v" id="doneKm">0.0<small>km</small></div><div class="l">歩いた</div></div>
+      <div class="tile"><div class="ico">🏁</div><div class="v" id="restKm">―<small>km</small></div><div class="l">残り</div></div>
+      <div class="tile cal"><div class="ico">🔥</div><div class="v" id="cal">0<small></small></div><div class="l">kcal</div></div>
+      <div class="tile gain"><div class="ico">📈</div><div class="v" id="gain">0<small>m</small></div><div class="l">累積↑</div></div>
+    </div>
+    <div class="tiles" style="grid-template-columns:1fr 1fr;">
+      <div class="tile eta"><div class="ico">🕒</div><div class="v" id="eta">―</div><div class="l">到着予定</div></div>
+      <div class="tile"><div class="ico">⏳</div><div class="v" id="restMin">―<small>分</small></div><div class="l">残り時間(目安)</div></div>
+    </div>
+
+    <div class="chartcard">
+      <div class="label"><span>⛰ 標高プロフィール</span><span class="now" id="nowAlt"></span></div>
+      <svg class="chart" id="chart" viewBox="0 0 560 120" preserveAspectRatio="none"></svg>
+      <div class="chart-foot"><span id="elevStart">スタート</span><span id="elevGoal">ゴール</span></div>
+    </div>
+    <div class="warn" id="offWarn" style="display:none">⚠️ ルートから約<b id="offDist">―</b>m 離れています。進捗は参考値です。</div>
+  </div>
+</div>
+
+<!-- drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="dr-head">
+    <div class="logo">🏔</div>
+    <h2>TAKAO NAVI</h2>
+    <p>高尾山 登山ナビ ／ 設定</p>
+  </div>
+  <div class="dr-body">
+    <div class="dr-sec">
+      <p class="label">登山コース</p>
+      <select id="course"></select>
+      <div class="cdesc" id="cdesc"></div>
+    </div>
+    <div class="dr-sec">
+      <p class="label">プロフィール</p>
+      <div class="row">
+        <div><span class="flab">年齢</span><input type="number" id="age" min="5" max="100" placeholder="40"></div>
+        <div><span class="flab">性別</span><select id="sex"><option value="male">男性</option><option value="female">女性</option></select></div>
+        <div><span class="flab">体重kg</span><input type="number" id="weight" min="20" max="150" placeholder="60"></div>
+      </div>
+      <button class="btn btn-save mt" id="saveBtn">保存する</button>
+      <div class="savemsg" id="savedMsg"></div>
+    </div>
+    <div class="dr-sec">
+      <p class="label">オフライン地図</p>
+      <p class="cdesc" style="margin-top:0">電波のある場所で高尾山中心部の地図を端末に保存します。山中で電波がなくても地図が表示できます。</p>
+      <button class="btn btn-dl mt" id="dlBtn">📥 中心部の地図を保存</button>
+      <div class="dlmsg" id="dlMsg"></div>
+    </div>
+    <div class="dr-sec">
+      <p class="label">データ出典</p>
+      <p class="cdesc" style="margin-top:0">座標: OpenStreetMap (ODbL)／標高: 国土地理院 標高API／地図: 地理院タイル。実際の登山では公式標識を優先してください。</p>
+    </div>
+  </div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ===== コースデータ(座標OSM/標高=国土地理院実測) ===== */
+const COURSES = {
+  c1:{name:"1号路（表参道コース）",diff:1,len:3.8,up:100,down:80,desc:"高尾山のメインルート。約9割が舗装路で初心者向き。薬王院・たこ杉・天狗焼など見どころ多数。トイレ5ヶ所。",
+    pts:[[35.63185,139.26679,213,"清滝駅前広場"],[35.63233,139.26563,227,"金比羅台分岐下"],[35.63329,139.26321,245,"金比羅台付近"],[35.63346,139.26023,377,"霞台園地下"],[35.63036,139.25636,466,"高尾山駅"],[35.62989,139.25323,480,"浄心門・たこ杉"],[35.63006,139.25195,478,"権現茶屋"],[35.62906,139.25190,490,"薬王院 仁王門"],[35.62847,139.25099,516,"薬王院 本堂"],[35.62807,139.24914,456,"奥の院上"],[35.62683,139.24685,547,"山頂下トイレ"],[35.62523,139.24369,598,"高尾山 山頂"]]},
+  c2:{name:"2号路（霞台ループ）",diff:2,len:0.9,up:40,down:40,loop:true,desc:"高尾山駅近くの霞台を起点に中腹を周遊。南北で植生が異なる。1周約40分。トイレなし・急階段あり。",
+    pts:[[35.63036,139.25636,466,"霞台(高尾山駅)"],[35.63110,139.25590,455,"北側ルート入口"],[35.63150,139.25450,448,"圏央道展望点"],[35.63060,139.25300,470,"浄心門付近"],[35.62960,139.25420,460,"南側ルート"],[35.62990,139.25600,463,"霞台南"],[35.63036,139.25636,466,"霞台に戻る"]]},
+  c3:{name:"3号路（かつら林）",diff:2,len:2.4,up:60,down:50,desc:"浄心門手前から山頂へ。南斜面の常緑樹林を進む静かな道。山頂付近のかつら林が見どころ。軽登山靴推奨。",
+    pts:[[35.62989,139.25323,480,"浄心門(分岐)"],[35.62870,139.25230,495,"南斜面の道"],[35.62760,139.25080,510,"木橋"],[35.62680,139.24870,530,"かしき谷園地"],[35.62640,139.24650,558,"5号路合流"],[35.62561,139.24436,585,"薬王院道合流"],[35.62523,139.24369,598,"高尾山 山頂"]]},
+  c4:{name:"4号路（吊り橋）",diff:2,len:1.5,up:50,down:40,desc:"浄心門手前から山頂下で1号路に合流。高尾山唯一の吊り橋「みやま橋」(全長36m)が名物。落葉広葉樹林。",
+    pts:[[35.63010,139.25282,478,"浄心門(分岐)"],[35.63017,139.25160,470,"北斜面の道"],[35.62950,139.24905,475,"みやま橋"],[35.62920,139.24830,495,"いろはの森分岐"],[35.62890,139.24905,515,"4号路上部"],[35.62803,139.24884,456,"5号路合流付近"],[35.62643,139.24454,560,"1号路合流"],[35.62523,139.24369,598,"高尾山 山頂"]]},
+  c5:{name:"5号路（山頂ループ）",diff:1,len:0.9,up:30,down:30,loop:true,desc:"山頂直下を一周。高低差が少なく道幅も広い。江戸末期の人工林「江川杉」が見どころ。全ルートと交差。",
+    pts:[[35.62561,139.24436,585,"山頂直下(東)"],[35.62588,139.24341,580,"北側"],[35.62468,139.24169,565,"江川杉(西)"],[35.62357,139.24364,565,"南側"],[35.62426,139.24457,575,"もみじ台分岐"],[35.62523,139.24369,598,"一周(山頂へ)"]]},
+  c6:{name:"6号路（びわ滝/沢）",diff:3,len:3.3,up:100,down:80,desc:"清滝駅から前の沢沿いに登る「水のコース」。びわ滝・飛び石の沢登りあり。自然研究路で最も険しく上級者向き。夏は涼しい。",
+    pts:[[35.63185,139.26679,213,"清滝駅(6号路口)"],[35.63095,139.26500,235,"妙音橋"],[35.62980,139.26280,308,"琵琶滝"],[35.62820,139.25950,319,"大山橋"],[35.62680,139.25600,400,"沢沿いの道"],[35.62560,139.25200,490,"飛び石(沢登り)"],[35.62520,139.24800,545,"5号路合流階段"],[35.62500,139.24550,575,"山頂手前"],[35.62523,139.24369,598,"高尾山 山頂"]]},
+  ci:{name:"稲荷山コース（見晴らし尾根）",diff:2,len:3.1,up:100,down:80,desc:"清滝駅南側から尾根道を進む本格ルート。稲荷山展望台から都心の眺望。低コースと交差せず登山らしさを満喫できる。",
+    pts:[[35.63102,139.26701,213,"清滝駅(稲荷山口)"],[35.63040,139.26580,245,"旭稲荷"],[35.62950,139.26350,320,"尾根取付"],[35.62830,139.26050,395,"稲荷山展望台"],[35.62720,139.25700,455,"見晴らし尾根"],[35.62620,139.25250,515,"尾根道上部"],[35.62560,139.24850,555,"山頂直下の階段"],[35.62540,139.24550,580,"5号路合流"],[35.62523,139.24369,598,"高尾山 山頂"]]},
+  cj:{name:"高尾山〜陣馬山 縦走",diff:3,len:17.0,up:330,down:330,desc:"山頂から城山・景信山・堂所山を経て陣馬山へ。距離約17km・約4.5〜5時間の本格縦走。装備と体力が必要。",
+    pts:[[35.62523,139.24369,598,"高尾山 山頂"],[35.62621,139.24277,578,"もみじ台/苺山"],[35.62700,139.23500,560,"一丁平"],[35.62987,139.22117,670,"小仏城山"],[35.63600,139.22000,548,"小仏峠"],[35.64601,139.21589,727,"景信山"],[35.65000,139.20500,680,"明王峠手前"],[35.65243,139.19406,733,"堂所山"],[35.65300,139.18000,700,"明王峠"],[35.65217,139.16651,857,"陣馬山 山頂"]]}
+};
+function badgeCls(d){return d==1?'b1':d==2?'b2':'b3';}
+function badgeTxt(d){return d==1?'初級':d==2?'中級':'上級';}
+
+const R=6371000,toRad=d=>d*Math.PI/180;
+function dist(a,b,c,d){const dLat=toRad(c-a),dLon=toRad(d-b);const s=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
+
+let CUR=null,CURKEY='c1',DIR='up',cum=[],GEOLEN=0;
+function dirPts(){return DIR==='up'?CUR.pts:CUR.pts.slice().reverse();}
+
+/* 標高実測化 */
+const EC={};
+async function fetchElev(lat,lon){const k=lat.toFixed(5)+','+lon.toFixed(5);if(EC[k]!=null)return EC[k];
+  try{const r=await fetch('https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon='+lon+'&lat='+lat+'&outtype=JSON');const j=await r.json();if(typeof j.elevation==='number'){EC[k]=j.elevation;return j.elevation;}}catch(e){}return null;}
+async function refineElev(key){const c=COURSES[key];if(!navigator.onLine)return;
+  for(const p of c.pts){const e=await fetchElev(p[0],p[1]);if(e!=null)p[2]=Math.round(e*10)/10;}
+  c._refined=true;if(CURKEY===key){rebuild();drawChart();renderMeta();}}
+
+function loadCourse(key){CURKEY=key;CUR=COURSES[key];rebuild();drawRoute();drawChart();renderMeta();resetStats();if(!CUR._refined)refineElev(key);}
+function rebuild(){const p=dirPts();cum=[0];for(let i=1;i<p.length;i++)cum[i]=cum[i-1]+dist(p[i-1][0],p[i-1][1],p[i][0],p[i][1]);GEOLEN=cum[cum.length-1];}
+
+function renderMeta(){
+  const p=dirPts(),time=(DIR==='up')?CUR.up:CUR.down;
+  document.getElementById('ovRouteName').textContent=CUR.name;
+  const bd=document.querySelector('#ovRoute .bd');bd.className='bd '+badgeCls(CUR.diff);bd.textContent=badgeTxt(CUR.diff);
+  document.getElementById('goalLbl').textContent=CUR.loop?'1周まで':(DIR==='up'?'山頂まで':'下山まで');
+  document.getElementById('elevStart').textContent=p[0][3]+' '+Math.round(p[0][2])+'m';
+  document.getElementById('elevGoal').textContent=p[p.length-1][3]+' '+Math.round(p[p.length-1][2])+'m';
+  let gain=0;for(let i=1;i<p.length;i++){const d=p[i][2]-p[i-1][2];if(d>0)gain+=d;}
+  document.getElementById('cdesc').innerHTML='距離 約'+CUR.len+'km ／ '+(CUR.loop?'1周':(DIR==='up'?'登り':'下り'))+time+'分 ／ 累積↑'+Math.round(gain)+'m<br><br>'+CUR.desc;
+}
+
+function project(lat,lon){let best={d:Infinity};const p=dirPts();
+  for(let i=0;i<p.length-1;i++){const ax=p[i][1],ay=p[i][0],bx=p[i+1][1],by=p[i+1][0];const apx=lon-ax,apy=lat-ay,abx=bx-ax,aby=by-ay,ab2=abx*abx+aby*aby;let t=ab2?(apx*abx+apy*aby)/ab2:0;t=Math.max(0,Math.min(1,t));const px=ax+abx*t,py=ay+aby*t,d=dist(lat,lon,py,px);if(d<best.d){const sl=cum[i+1]-cum[i];best={d,seg:i,along:cum[i]+sl*t,alt:p[i][2]+(p[i+1][2]-p[i][2])*t};}}
+  return best;}
+
+/* 標高チャート */
+function drawChart(){const p=dirPts(),W=560,H=120,pad=8;const a=p.map(x=>x[2]),mn=Math.min(...a),mx=Math.max(...a),rng=Math.max(1,mx-mn);
+  const xs=i=>pad+(cum[i]/GEOLEN)*(W-2*pad),ys=v=>H-pad-((v-mn)/rng)*(H-2*pad-10);
+  let area='M '+xs(0)+' '+H,line='';p.forEach((pt,i)=>{const x=xs(i),y=ys(pt[2]);area+=' L '+x+' '+y;line+=(i?' L ':'M ')+x+' '+y;});area+=' L '+xs(p.length-1)+' '+H+' Z';
+  document.getElementById('chart').innerHTML='<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#43b65f" stop-opacity=".45"/><stop offset="1" stop-color="#43b65f" stop-opacity=".05"/></linearGradient></defs><path d="'+area+'" fill="url(#eg)"/><path d="'+line+'" fill="none" stroke="#1f7a3d" stroke-width="2.5" stroke-linejoin="round"/><circle id="cdot" cx="'+xs(0)+'" cy="'+ys(p[0][2])+'" r="0" fill="#ff6b35" stroke="#fff" stroke-width="2.5"/>';}
+function moveDot(p,alt){const W=560,pad=8,H=120,dot=document.getElementById('cdot');if(!dot)return;const a=dirPts().map(x=>x[2]),mn=Math.min(...a),mx=Math.max(...a),rng=Math.max(1,mx-mn);dot.setAttribute('cx',pad+p*(W-2*pad));dot.setAttribute('cy',H-pad-((alt-mn)/rng)*(H-2*pad-10));dot.setAttribute('r',5.5);}
+
+/* 地図 */
+const map=L.map('map',{zoomControl:false}).setView([35.628,139.255],14);
+L.control.zoom({position:'bottomleft'}).addTo(map);
+const tiles=L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'地理院タイル|OSM',maxZoom:17,crossOrigin:true}).addTo(map);
+let routeLayer,startM,goalM,youMarker;
+function drawRoute(){[routeLayer,startM,goalM].forEach(l=>{if(l)map.removeLayer(l);});const p=dirPts(),line=p.map(x=>[x[0],x[1]]);
+  routeLayer=L.polyline(line,{color:'#2563eb',weight:5,opacity:.85}).addTo(map);
+  startM=L.circleMarker(line[0],{radius:8,color:'#fff',fillColor:'#1f7a3d',fillOpacity:1,weight:3}).addTo(map).bindPopup('スタート: '+p[0][3]);
+  goalM=L.circleMarker(line[line.length-1],{radius:8,color:'#fff',fillColor:'#ef4444',fillOpacity:1,weight:3}).addTo(map).bindPopup('ゴール: '+p[p.length-1][3]);
+  map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});}
+
+function metsFor(d){return d==1?4.5:d==2?6.0:7.0;}
+function profile(){return{weight:+(localStorage.getItem('tk_weight')||60)};}
+
+function setPct(p){document.getElementById('pctTxt').textContent=Math.round(p*100);}
+function resetStats(){setPct(0);document.getElementById('doneKm').innerHTML='0.0<small>km</small>';document.getElementById('restKm').innerHTML=CUR.len.toFixed(1)+'<small>km</small>';document.getElementById('gain').innerHTML='0<small>m</small>';document.getElementById('restMin').innerHTML=(DIR==='up'?CUR.up:CUR.down)+'<small>分</small>';document.getElementById('eta').textContent='―';document.getElementById('cal').textContent='0';document.getElementById('nowAlt').textContent='';document.getElementById('offWarn').style.display='none';movedM=0;lastLat=null;activeMs=0;walkedGain=0;lastAlt=null;if(document.getElementById('cdot'))document.getElementById('cdot').setAttribute('r',0);}
+
+let lastLat=null,lastLon=null,lastT=0,movedM=0,activeMs=0,walkedGain=0,lastAlt=null;
+function update(lat,lon,acc){const pr=project(lat,lon),now=Date.now();
+  if(pr.d>60){document.getElementById('offWarn').style.display='block';document.getElementById('offDist').textContent=Math.round(pr.d);}else document.getElementById('offWarn').style.display='none';
+  const p=Math.max(0,Math.min(1,pr.along/GEOLEN));setPct(p);
+  document.getElementById('doneKm').innerHTML=(p*CUR.len).toFixed(1)+'<small>km</small>';
+  document.getElementById('restKm').innerHTML=Math.max(0,CUR.len-p*CUR.len).toFixed(1)+'<small>km</small>';
+  moveDot(p,pr.alt);document.getElementById('nowAlt').textContent='現在 '+Math.round(pr.alt)+'m';
+  if(lastAlt!=null){const da=pr.alt-lastAlt;if(da>0.5)walkedGain+=da;}lastAlt=pr.alt;
+  document.getElementById('gain').innerHTML=Math.round(walkedGain)+'<small>m</small>';
+  const baseT=(DIR==='up')?CUR.up:CUR.down,rm=Math.round(baseT*(1-p));
+  document.getElementById('restMin').innerHTML=rm+'<small>分</small>';
+  document.getElementById('eta').textContent=new Date(now+rm*60000).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  if(lastLat!==null){const step=dist(lastLat,lastLon,lat,lon);if(step>Math.max(5,acc*0.5)&&step<200){movedM+=step;activeMs+=(now-lastT);}}lastLat=lat;lastLon=lon;lastT=now;
+  document.getElementById('cal').textContent=Math.round(metsFor(CUR.diff)*profile().weight*(activeMs/3600000));
+  if(!youMarker){youMarker=L.marker([lat,lon],{icon:L.divIcon({className:'',html:'<div class="youdot pulse"></div>',iconSize:[18,18]})}).addTo(map);}else youMarker.setLatLng([lat,lon]);
+  map.setView([lat,lon],16);document.getElementById('status').textContent='✓ 計測中 '+new Date(now).toLocaleTimeString('ja-JP')+'（精度約'+Math.round(acc)+'m）';}
+
+let watchId=null;const btn=document.getElementById('gpsBtn');
+btn.addEventListener('click',()=>{if(watchId===null){if(!navigator.geolocation){document.getElementById('status').textContent='GPS非対応端末です';return;}
+  document.getElementById('status').textContent='現在地を取得中…（許可してください）';lastT=Date.now();
+  watchId=navigator.geolocation.watchPosition(pos=>update(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy||30),err=>{document.getElementById('status').textContent='⚠️ '+err.message;},{enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+  btn.textContent='■ 停止';btn.classList.add('btn-stop');}else{navigator.geolocation.clearWatch(watchId);watchId=null;btn.textContent='▶ 再開';btn.classList.remove('btn-stop');document.getElementById('status').textContent='⏸ 停止中';lastLat=null;}});
+
+function setDir(d){DIR=d;document.getElementById('dirUp').classList.toggle('on',d==='up');document.getElementById('dirDown').classList.toggle('on',d==='down');rebuild();drawRoute();drawChart();renderMeta();resetStats();}
+document.getElementById('dirUp').onclick=()=>setDir('up');document.getElementById('dirDown').onclick=()=>setDir('down');
+
+/* drawer */
+const scrim=document.getElementById('scrim'),drawer=document.getElementById('drawer');
+function openDr(){scrim.classList.add('open');drawer.classList.add('open');}
+function closeDr(){scrim.classList.remove('open');drawer.classList.remove('open');}
+document.getElementById('hamBtn').onclick=openDr;scrim.onclick=closeDr;
+
+/* profile */
+function loadProfile(){document.getElementById('age').value=localStorage.getItem('tk_age')||'';document.getElementById('sex').value=localStorage.getItem('tk_sex')||'male';document.getElementById('weight').value=localStorage.getItem('tk_weight')||'';}
+document.getElementById('saveBtn').onclick=()=>{const a=document.getElementById('age').value,w=document.getElementById('weight').value;if(a)localStorage.setItem('tk_age',a);localStorage.setItem('tk_sex',document.getElementById('sex').value);if(w)localStorage.setItem('tk_weight',w);const m=document.getElementById('savedMsg');m.textContent='✓ 保存しました';setTimeout(()=>m.textContent='',2000);};
+
+/* オフライン地図ダウンロード(中心部のみ) */
+function lon2x(lon,z){return Math.floor((lon+180)/360*Math.pow(2,z));}
+function lat2y(lat,z){return Math.floor((1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*Math.pow(2,z));}
+document.getElementById('dlBtn').onclick=async()=>{
+  const msg=document.getElementById('dlMsg');
+  if(!('caches'in window)){msg.textContent='この環境では保存できません(HTTPS必須)';return;}
+  // 高尾山中心部: 清滝〜山頂周辺
+  const N=35.640,S=35.620,W=139.240,E=139.272,zooms=[13,14,15,16,17];
+  let urls=[];
+  for(const z of zooms){const x1=lon2x(W,z),x2=lon2x(E,z),y1=lat2y(N,z),y2=lat2y(S,z);
+    for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++)urls.push('https://cyberjapandata.gsi.go.jp/xyz/std/'+z+'/'+x+'/'+y+'.png');}
+  const cache=await caches.open('takao-tiles-v1');let done=0;
+  msg.textContent='保存中… 0/'+urls.length;
+  for(const u of urls){try{const res=await fetch(u,{mode:'cors'});if(res.ok)await cache.put(u,res.clone());}catch(e){}done++;if(done%20===0||done===urls.length)msg.textContent='保存中… '+done+'/'+urls.length;}
+  msg.textContent='✓ 地図を保存しました ('+urls.length+'枚)';
+};
+
+/* オフライン検知 */
+function updateOnline(){document.getElementById('offPill').classList.toggle('show',!navigator.onLine);}
+window.addEventListener('online',updateOnline);window.addEventListener('offline',updateOnline);updateOnline();
+
+/* SW登録 */
+if('serviceWorker'in navigator){navigator.serviceWorker.register('service-worker.js').catch(()=>{});}
+
+/* init */
+const sel=document.getElementById('course');
+for(const k in COURSES){const o=document.createElement('option');o.value=k;o.textContent=COURSES[k].name;sel.appendChild(o);}
+sel.onchange=()=>{loadCourse(sel.value);closeDr();};
+loadProfile();loadCourse('c1');
+</script>
+</body>
+</html>
